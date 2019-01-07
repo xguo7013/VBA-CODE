@@ -1,0 +1,42 @@
+Public textFileName As String
+
+
+Sub openDialog()
+    Dim fd As Office.FileDialog
+    Dim objfso As New FileSystemObject
+    Dim textFileName As String ' The file path (including filename and ext)
+    Dim sourceBook As Workbook ' Where to copy from
+    Dim targetBook As Workbook ' Where to copy to
+    
+    Set fd = Application.FileDialog(msoFileDialogFilePicker)
+    
+    ' Prompt the user to select the new file
+    With fd
+        .InitialFileName = "\\sv-hfi-014\Analysis\Encounter_Reporting\NY\PHSP_Encounters\Reconcilations\DWH_Load_Rec\"
+        .AllowMultiSelect = False
+        .Title = "Please select the file."
+        .Show
+        .Filters.Add "ALL Files", "*.*"
+        ' Assign the filepath selected to textfilename variable
+        
+        textFileName = .SelectedItems(1)
+        
+   End With
+   
+   ' Debugging
+   MsgBox textFileName
+   
+   ' Reference: https://stackoverflow.com/questions/29092465/copy-sheet-from-one-wb-to-another-using-vba-without-opening-destination-wb
+   Set sourceBook = Application.Workbooks.Open(textFileName, _
+        UpdateLinks:=False, _
+        ReadOnly:=True, _
+        AddToMRU:=False)
+        
+    sourceBook.Sheets(1).Copy After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
+    sourceBook.Sheets(2).Copy After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
+   sourceBook.Close
+   
+  
+End Sub
+
+
