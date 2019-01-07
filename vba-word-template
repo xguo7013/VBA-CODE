@@ -1,0 +1,219 @@
+Option Explicit
+Dim Setting As Worksheet
+Dim Source As Worksheet
+Dim CWB As Workbook
+Dim NWB As Object
+Dim Top_Diag_CN As Integer
+
+Sub Provider_OutReach()
+Dim FSO As Object
+Dim Wordapp As Object
+Dim lastrow As Long
+Dim i, j, k As Long
+Dim template_loc As String
+Dim Output_loc As String
+Dim NPI As String
+Dim membno As String
+Dim C_NPI, C_Pname, C_membno, C_HCIN, C_Mname, C_MDOB, C_HCC, C_HCCDesc, C_Diagcd, C_DiagDesc As Integer
+Dim Count As Integer
+Dim x, y, z As Integer
+Dim Top_Diag_CN, Top_DiagDesc_CN As Integer
+
+
+C_NPI = 1
+C_Pname = 2
+C_membno = 3
+C_HCIN = 4
+C_Mname = 5
+C_MDOB = 6
+C_HCC = 7
+C_HCCDesc = 8
+C_Diagcd = 9
+C_DiagDesc = 10
+Top_Diag_CN = 11
+Top_DiagDesc_CN = 16
+
+Application.DisplayAlerts = False
+Set FSO = CreateObject("scripting.filesystemobject")
+Set Wordapp = CreateObject("Word.Application")
+Wordapp.Visible = False
+Set CWB = Excel.ThisWorkbook
+Set Setting = CWB.Sheets("Setting")
+Set Source = CWB.Sheets("Source")
+lastrow = Source.Cells.Find("*", [A1], , , xlByRows, xlPrevious).Row
+Output_loc = Setting.Cells(6, 2)
+
+Call checkmarks
+
+For i = 2 To lastrow
+    If i = 2 Then
+        'this is only for first record.
+        NPI = Source.Cells(i, C_NPI)
+        membno = Source.Cells(i, C_membno)
+        If NPI = "1659354983" Or NPI = "1083646970" Or NPI = "1225103583" Then
+            template_loc = Setting.Cells(5, 2)
+        Else
+           
+            template_loc = Setting.Cells(5, 2)
+        End If
+        Set NWB = Wordapp.Documents.Open(template_loc)
+        Call Word_replacement("@ProviderName@", Source.Cells(i, C_Pname))
+        Call Word_replacement("@ProviderNPI@", Source.Cells(i, C_NPI))
+        Call Word_replacement("@Patient-Name@", Source.Cells(i, C_Mname))
+        Call Word_replacement("@BirthDay@", Source.Cells(i, C_MDOB))
+        Call Word_replacement("@HealthfirstID@", Source.Cells(i, C_membno))
+        Call Word_replacement("@HICN@", Source.Cells(i, C_HCIN))
+        Call Word_replacement("@HCC+Description1@", Source.Cells(i, C_HCC) & " " & Source.Cells(i, C_HCCDesc))
+        Call Word_replacement("@Chekmark1@", Source.Cells(i, "V"))
+        '-----------------------------------------------------------------------------------------------------
+        Call Word_replacement(" @Diagcod1@1", Source.Cells(i, C_Diagcd) & " - " & Source.Cells(i, C_DiagDesc))
+       
+        For x = 0 To 2
+            If Source.Cells(i, C_Diagcd) <> Source.Cells(i, Top_Diag_CN + x) Then
+                Call Word_replacement(" @Diagcod1@2", Source.Cells(i, Top_Diag_CN + x) & " - " & Source.Cells(i, Top_DiagDesc_CN + x))
+                Exit For
+            End If
+        Next x
+        '-----------------------------------------------------------------------------------------------------
+        Count = 2
+        
+    ElseIf i <> 2 And Source.Cells(i, C_NPI) = NPI And Source.Cells(i, C_membno) = membno Then
+        Call Word_replacement("@HCC+Description" & Count & "@", Source.Cells(i, C_HCC) & " " & Source.Cells(i, C_HCCDesc))
+        Call Word_replacement("@Chekmark" & Count & "@", Source.Cells(i, "V"))
+        '-----------------------------------------------------------------------------------------------------
+        Call Word_replacement(" @Diagcod" & Count & "@1", Source.Cells(i, C_Diagcd) & " - " & Source.Cells(i, C_DiagDesc))
+        For x = 0 To 2
+            If Source.Cells(i, C_Diagcd) <> Source.Cells(i, Top_Diag_CN + x) Then
+                Call Word_replacement(" @Diagcod" & Count & "@2", Source.Cells(i, Top_Diag_CN + x) & " - " & Source.Cells(i, Top_DiagDesc_CN + x))
+                Exit For
+            End If
+        Next x
+        '-----------------------------------------------------------------------------------------------------
+        Count = Count + 1
+        'this is to prevent if the last record is not the first record.
+        If i = lastrow Then
+            If Count <= 10 Then
+                For j = 31 To (Count * 3 - 1) Step -1
+                    NWB.Tables(3).Rows(j).Delete
+                Next j
+            End If
+            NWB.SaveAs (Output_loc & "\Optimus_POC_" & NPI & "_" & membno & ".docx")
+            NWB.Close
+            Set NWB = Nothing
+        End If
+        
+    Else
+        'since this will be a new NPI and membno combo, we need to save current doc and create a new one.
+        If Count <= 10 Then
+            For k = 31 To (Count * 3 - 1) Step -1
+                NWB.Tables(3).Rows(k).Delete
+            Next k
+        End If
+        NWB.SaveAs (Output_loc & "\Optimus_POC_" & NPI & "_" & membno & ".docx")
+        NWB.Close
+        Set NWB = Nothing
+        'let's start the new doc for current NPI and membno combo
+        NPI = Source.Cells(i, C_NPI)
+        membno = Source.Cells(i, C_membno)
+        If NPI = "1659354983" Or NPI = "1083646970" Or NPI = "1225103583" Then
+            template_loc = Setting.Cells(5, 2)
+        Else
+           
+            template_loc = Setting.Cells(5, 2)
+        End If
+        Set NWB = Wordapp.Documents.Open(template_loc)
+        Call Word_replacement("@ProviderName@", Source.Cells(i, C_Pname))
+        Call Word_replacement("@ProviderNPI@", Source.Cells(i, C_NPI))
+        Call Word_replacement("@Patient-Name@", Source.Cells(i, C_Mname))
+        Call Word_replacement("@BirthDay@", Source.Cells(i, C_MDOB))
+        Call Word_replacement("@HealthfirstID@", Source.Cells(i, C_membno))
+        Call Word_replacement("@HICN@", Source.Cells(i, C_HCIN))
+        Call Word_replacement("@HCC+Description1@", Source.Cells(i, C_HCC) & " " & Source.Cells(i, C_HCCDesc))
+        Call Word_replacement("@Chekmark1@", Source.Cells(i, "V"))
+        '-----------------------------------------------------------------------------------------------------
+        Call Word_replacement(" @Diagcod1@1", Source.Cells(i, C_Diagcd) & " - " & Source.Cells(i, C_DiagDesc))
+        For x = 0 To 2
+            If Source.Cells(i, C_Diagcd) <> Source.Cells(i, Top_Diag_CN + x) Then
+                Call Word_replacement(" @Diagcod1@2", Source.Cells(i, Top_Diag_CN + x) & " - " & Source.Cells(i, Top_DiagDesc_CN + x))
+                Exit For
+            End If
+        Next x
+        '-----------------------------------------------------------------------------------------------------
+        Count = 2
+        'if last record is a unique NPI and membno combo, then we need to save this last doc
+        If i = lastrow Then
+            For k = 31 To (Count * 3 - 1) Step -1
+                NWB.Tables(3).Rows(k).Delete
+            Next k
+            NWB.SaveAs (Output_loc & "\Optimus_POC_" & NPI & "_" & membno & ".docx")
+            NWB.Close
+            Set NWB = Nothing
+        End If
+        
+    End If
+Next i
+
+Application.DisplayAlerts = True
+End Sub
+
+
+Sub Word_replacement(Keyword As String, Replaceword As String)
+    With NWB.Content.Find
+        .Text = Keyword
+        .Replacement.Text = Replaceword
+        .Wrap = 1
+        .Execute Replace:=2
+    End With
+End Sub
+
+
+
+Sub checkmarks()
+
+Dim lastrow As Long
+Dim i, j, k As Long
+Dim template_loc As String
+Dim Output_loc As String
+Dim NPI As String
+Dim membno As String
+Dim C_NPI, C_Pname, C_membno, C_HCIN, C_Mname, C_MDOB, C_HCC, C_HCCDesc, C_Diagcd, C_DiagDesc As Integer
+Dim Count As Integer
+Dim x, y, z As Integer
+Dim Top_Diag_CN, Top_DiagDesc_CN As Integer
+
+
+lastrow = Worksheets("Source").Cells.Find("*", [A1], , , xlByRows, xlPrevious).Row
+
+
+
+For i = 2 To lastrow
+   
+    If Cells(i, "A").Value = "1114035193" And Cells(i, "U").Value <> "DROP" Then
+        
+        Cells(i, "V").Value = ChrW(&H2713)
+        
+    ElseIf Cells(i, "A").Value = "1700874336" And Cells(i, "U").Value <> "DROP" Then
+        Cells(i, "V").Value = ChrW(&H2713)
+        
+    ElseIf Cells(i, "A").Value = "1346289048" And Cells(i, "U").Value <> "DROP" Then
+        Cells(i, "V").Value = ChrW(&H2713)
+        
+     ElseIf Cells(i, "A").Value = "1336171040" And Cells(i, "U").Value <> "DROP" Then
+        Cells(i, "V").Value = ChrW(&H2713)
+        
+    Else
+        Cells(i, "v").Value = ""
+        
+    
+         
+         
+    End If
+    
+Next i
+
+
+End Sub
+
+
+
+
