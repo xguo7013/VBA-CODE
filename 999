@@ -1,0 +1,342 @@
+' Update 12/06/2018: Increased the amount of segement to 99.
+
+Option Explicit
+
+' Declare a list of global variables
+Dim ISArray() As String
+Dim SearchNumber As Integer
+Dim FoundNumber As Integer
+Dim Found As Boolean
+
+' -----------------------------------------------------------------------------
+' Function triggered by 999 VBA button on master log
+' -----------------------------------------------------------------------------
+' @parm : There is none
+' It passes the paramater position to the Selection_999 helper function.
+' -----------------------------------------------------------------------------
+Sub TribleNine_Medicare()
+    Call Selection_999(8, 3, 9, 5, 6)
+End Sub
+
+' -----------------------------------------------------------------------------
+' Function triggered by TribleNine_Medicare(11, 3, 9, 2, 7)
+' -----------------------------------------------------------------------------
+' @parm TA1Col: Position of the 999.999 file name
+' @parm ISACol: Position of the ISA file name
+' @parm ISALen: Length of the ISA file name
+' @parm DateCol: Run Date (mm-dd-yyyy)
+' @parm FileCol: Filenames such as 837p..._Medicare_...
+'
+' It re-size (create) the ISArray into (numOfRow x 7) size, looping through the
+' entire spreadsheet that with blank 999 file name and valid 9 characters
+' isano. It track the "oldest Run Date" as compare date to check on 999 path
+' folder to determine if a file should be reviewed. It loads the isano,
+' filename and control file path into ISArray. The number of loop valid records
+' are stored in SearchNumber global variable. It then calls the Get999file
+' helper function to read if a file is accpeted (A) or rejected (P|0001..) in
+' the 999 level.
+' -----------------------------------------------------------------------------
+Sub Selection_999(TA1Col As Integer, ISACol As Integer, ISAlen As Integer, DateCol As Integer, fileCol As Integer)
+
+' Declare a list of function variables
+Dim userSelection As Range
+Dim FirstRow As Integer    ' Row number of first record in Medical tab
+Dim lastrow As Integer     ' Row number of last record in Setting tab
+Dim Count As Integer
+Dim MinDate As Date        ' Today's Date or the smallest Run Date
+Dim ISA As String
+Dim i As Integer
+Dim j As Integer
+Dim x As Integer
+Dim y As Integer
+Dim ws As Worksheet
+Dim t As Integer
+Dim fso As Scripting.FileSystemObject
+
+' Turn off screen update for stablitiy
+Application.ScreenUpdating = False
+' Point ws to setting tab
+Set ws = Excel.ThisWorkbook.Sheets("Ashn Setting")
+
+MinDate = Date    ' MinDate = Today's date
+FoundNumber = 0
+SearchNumber = 0
+
+' Figure out how many rows there are
+Set userSelection = Application.Selection
+FirstRow = userSelection.Cells(1, 1).Row
+lastrow = userSelection(userSelection.Count).Row
+
+' ISArray Reference, ++ mean assigned a different function.
+' ISArray column 0: ISA filename
+' ISArray column 1: ++ Rejected sequence P|0001|0002|0003 or A (Accepted)
+' ISArray column 2: Filename such as Prof_837_30_20181121_183250401
+' ISArray column 3: 999Path such as \\hfnt6\sasprod\IVANS\IN\999
+' ISArray column 4: ++ filename ENH3359.20180828.T223625.226657.1.999
+' ISArray column 5: -- Not used in this function
+' ISArray column 6: Row number represent LOB in setting
+' ISArray column 7: LOB code such as MRC, CCC, FDA, NSF
+
+ReDim ISArray(lastrow - FirstRow + 1, 7)
+
+' Looping through all the rows
+For i = FirstRow To lastrow
+    ' If ISA is not blank and matches 9 character long
+    If Trim(Cells(i, TA1Col)) = "" And Len(Cells(i, ISACol)) = ISAlen Then
+        For t = 4 To 7
+            ' Cells(t, 1) is vaule MCR/CCC/FDA/NSF from setting tab
+            ' Cells(i, 10) is value LOB code from Medical tab
+            ' If they are equal of each other
+            If ws.Cells(t, 1) = Cells(i, 2) Then
+                ' Reference: https://stackoverflow.com/q/7626967
+                ' x is defaulted to 0 on each new t for loop
+                x = x + 1
+                ISArray(x, 6) = t ' T = row number which represent LOBCOD
+                ISArray(x, 7) = Cells(i, 2) ' Actual LOB value
+                
+                ' If Today is greater than the run date, MinDate replaced with
+                ' the run date.
+                If MinDate > Format(Cells(i, DateCol).Value, "MM/DD/YYYY") Then
+                    MinDate = Format(Cells(i, DateCol).Value, "MM/DD/YYYY")
+                End If
+                
+                ' ISA filename - such as 183240302
+                ISArray(x, 0) = Cells(i, ISACol).Value
+                ' Filename - such as Prof_837_30_20181121_183250401
+                ISArray(x, 2) = Cells(i, fileCol).Value
+                ' 3rd position replaced by ws.(t, 2) which is 999 path.
+                ' such as \\hfnt6\sasprod\IVANS\IN\999
+                ISArray(x, 3) = ws.Cells(ISArray(x, 6), 2)
+                
+                ' If it found the LOB that match and executed the code,
+                ' exit the for loop (t=4 to 7) early.
+                Exit For
+            End If ' Check if ISA LOB = Setting LOB
+        Next t ' Loop all LOB position from setting
+    End If ' If ISA isn't empty
+Next i ' All avaliable rows in Medical tab
+
+' Search number is a global variable, count of files to work with
+SearchNumber = x
+
+' If there is at least one record (no null ISA file name)
+If ISArray(1, 0) <> "" Then
+
+    ' Invoking another helper function
+    Call Get999file(MinDate)
+    
+    ' Looping all 2k rows
+    For j = FirstRow To lastrow
+
+        ' Loop the number of matched ISA filename
+        For y = 1 To UBound(ISArray, 1)
+            
+            ' If the ISA filename match
+            ISA = Cells(j, ISACol).Value
+            
+            ' If ISA filename and 999 filename is not null
+            ' it is assigned in the Search999File() sub2 function
+            If ISA = ISArray(y, 0) And ISArray(y, 4) <> "" Then
+                
+                ' Update the 999 file name and 999 status
+                Cells(j, TA1Col) = ISArray(y, 4)
+                Cells(j, TA1Col + 1) = ISArray(y, 1)
+                
+                Set fso = New Scripting.FileSystemObject
+                ' filepath \ filetype \ LOB \ filename
+                ' George 1: I am not sure how it is actually moving file.
+                ' George 2: Look at the comma, it is moving 999path\filename
+                '           to 999TempPath\filename
+                '                                               |
+                '                                              vvv
+                fso.MoveFile ISArray(y, 3) & "\" & ISArray(y, 4), ws.Cells(ISArray(x, 6), 3) & "\" & ISArray(y, 4)
+                '                                              ^^^
+                '                                               |
+                Exit For
+            End If
+        Next y
+    Next j
+Else: MsgBox "ISA number is not found or 999 is already  in the selection!"
+End If
+
+' Turn screen update back on
+Application.ScreenUpdating = True
+End Sub
+
+' -----------------------------------------------------------------------------
+' Function triggered by TribleNine_Medicare(11, 3, 9, 2, 7)
+' -----------------------------------------------------------------------------
+' @parm TA1Col: Position of the 999.999 file name
+' @parm ISACol: Position of the ISA file name
+' @parm ISALen: Length of the ISA file name
+' @parm DateCol: Run Date (mm-dd-yyyy)
+' @parm FileCol: Filenames such as 837p..._Medicare_...
+'
+' It passes the paramater position to the Selection_999 helper function. It
+' read and loop the list of isano from master log and compare with what is
+' currently in the 999 path. If the file's date is newer than the oldest run
+' date the function will invoke the search999files on it. It is a double for
+' loop implementation instead of looking up from array (?).
+' -----------------------------------------------------------------------------
+Sub Get999file(Rundate As Date)
+Dim fso As Scripting.FileSystemObject ' FileSystemObject Tree
+Dim SourceFolder As Scripting.Folder  ' Allow to create, delete, move folder
+Dim FileItem As Scripting.File        ' Allow to create, delete, move file
+Dim i As Integer                      ' For Loop
+
+Set fso = New Scripting.FileSystemObject
+
+' Do number of valid ISA number file count (Where SearchNumber is Global)
+
+' Looping each ISA Number, then Looping each ISA Number File inside 999 path,
+' if match moves on to the next ISA Number. This is a double for loop
+' execution, the previous programmer attempted to be efficent by exiting early.
+For i = 1 To SearchNumber
+    Dim FileDir As String
+    
+    Found = False ' Global variable flag to commuicate between function
+    FileDir = ISArray(i, 3) ' 999 file path
+    
+    Set SourceFolder = fso.GetFolder(FileDir)
+    
+    ' Looping each file(s) in \\hfnt6\sasprod\IVANS\IN\999 folder
+    For Each FileItem In SourceFolder.Files
+        ' If the file's modification date is newer than the last known run date
+        If FileItem.DateLastModified >= Rundate Then
+            
+            ' Invoke another helper function to read it's content
+            Call Search999File(FileDir, FileItem.Name, i)
+            
+            ' If found this 999 file, then go to next ISA number name.
+            If Found Then
+                ' If found no need to search anymore current file
+                GoTo LastLine
+            End If ' End of checking global variable Found value
+        End If ' End of checking DateLastModified >= Rundate
+    Next FileItem
+' Marker to advance to next file search
+LastLine:
+Next i
+End Sub
+
+' -----------------------------------------------------------------------------
+' Function triggered by Search999File(FileDir, FileItem.Name, i)
+' -----------------------------------------------------------------------------
+' @parm FileDir: 999 Shared Drive Folder Path
+' @parm Filename: .999 file name such as ENH3359.20181204.T143054.744488.1.999
+' @parm ArrayNumber: Which row position (x,y) for current iteration
+'
+' Function to read the 999 files, separate it by ~ delimiter and then separate
+' by * delimiter again. First it loop to identify the matching isano from the
+' array and the 999 file AK1 segement. For the rejected file, it constuct which
+' are the problematic sequence. P|0001|0002|0003 etc. The assignment happened
+' when file is match and reached AK9 segment. Check the 999 files requested
+' by the main function Trible_999 isano and their 999 level status.
+' -----------------------------------------------------------------------------
+Sub Search999File(FileDir As String, filename As String, Arraynumber As Integer)
+
+Dim strFileName As String
+Dim strLine As String
+Dim i As Integer
+Dim start() As String
+Dim LArray() As String
+Dim BArray() As String
+Dim match As Boolean
+Dim x As Integer
+Dim stloop(99, 2) As String ' This determine how many segement it can handle
+Dim Rejection As String
+Dim Delimiter As String
+Dim StartLine As String
+Dim StartArray() As String
+Dim j As Long
+
+' ISArray Reference
+' ISArray column 0: ISA filename
+' ISArray column 1: ++ Rejected sequence P|0001|0002|0003 etc
+' ISArray column 2: Filename such as Prof_837_30_20181121_183250401
+' ISArray column 3: 999Path such as \\hfnt6\sasprod\IVANS\IN\999
+' ISArray column 4: ++ filename ENH3359.20180828.T223625.226657.1.999
+' ISArray column 5: -- Not used in this function
+' ISArray column 6: Row number represent LOB in setting
+' ISArray column 7: LOB code such as MRC, CCC, FDA, NSF
+
+x = 1 ' Counter variable
+match = False ' Match flag blooean value
+
+If ISArray(Arraynumber, 7) <> "" Then
+    Delimiter = "*"
+    strFileName = FileDir & "\" & filename
+    
+    ' Close #1 input just in case it is still open.
+    Close #1
+    ' Open the ISA file
+    Open strFileName For Input As #1
+    
+    ' Loading the first line into "Start Line"
+    Line Input #1, StartLine
+    
+    ' Separate it by ~ symbol
+    StartArray = Split(StartLine, "~")
+    
+    ' Looping through the number of delimited field (~)
+    For j = 0 To UBound(StartArray) - 1
+        ' Reset BArray
+        ReDim BArray(5)
+        ' Placing the delimited value into strLine
+        strLine = StartArray(j)
+        ' Separating each (~) delimited value by (*) again, store into BArray
+        BArray = Split(strLine, Delimiter, 5)
+        
+        ' If the first (*) delimited value is AK1
+        If match = False And BArray(0) = "AK1" Then
+            ' Check if isano value matches
+            If BArray(2) = ISArray(Arraynumber, 0) Then
+                ' Update the 4th column as the .999 filename
+                ISArray(Arraynumber, 4) = filename
+                ' Update the flags
+                match = True
+                Found = True
+            Else
+                Exit For
+            End If
+        
+        ' If this is the right file & reaches AK2 segement
+        ' Holding below code until it is an isano match.
+        ElseIf match = True And BArray(0) = "AK2" Then
+        
+            ' The x represent the number of loop (times it see AK2
+            ' BArray(2) stores (0001) (0002) ... etc
+            ' If you get out of bound error here, you need to increase the size
+            ' last updated on 12/06/2018 to 99.
+            stloop(x, 1) = BArray(2)
+            
+        ' If this is the right file & reaches IK5 segement
+        ElseIf match = True And BArray(0) = "IK5" Then
+            stloop(x, 2) = BArray(1)
+            
+            ' Assign (0001) (0002) ... ?
+            If BArray(1) = "R" Then
+                Rejection = Rejection & "|" & stloop(x, 1)
+            End If
+            x = x + 1
+        
+        ' If this is the right file & reaches AK9 segment
+        ElseIf match = True And BArray(0) = "AK9" Then
+            ' I think this is the 999 Status determination, parsing from
+            ' the ISA 999 files.
+            If BArray(1) = "P" Then
+                ISArray(Arraynumber, 1) = "P" & Rejection
+            ' Else it is accpeted (A)
+            Else: ISArray(Arraynumber, 1) = BArray(1)
+            End If
+            
+            Exit For
+        End If
+    Next j
+End If
+
+Close #1
+End Sub
+
+
+
