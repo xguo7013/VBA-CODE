@@ -1,0 +1,282 @@
+Option Explicit
+Dim ISArray() As String
+Dim SearchNumber As Integer
+Dim FoundNumber As Integer
+Dim Found As Boolean
+Sub Two77CA_Medicare()
+Call Selection_277CA(10, 3, 9, 5, 6)
+'(277CA column position,ISANO column position, IASNO length, run date column position, Filename column)
+
+End Sub
+
+
+Sub Selection_277CA(TA1Col As Integer, ISACol As Integer, ISAlen As Integer, DateCol As Integer, fileCol As Integer)
+Dim userSelection As Range
+Dim fso As Object
+Dim FirstRow As Integer
+Dim lastrow As Integer
+Dim Count As Integer
+Dim MinDate As Date
+Dim ISA As String
+Dim i As Integer
+Dim j As Integer
+Dim x As Integer
+Dim y As Integer
+Dim t As Long
+Dim r As Long
+Dim a As Integer
+Dim ws As Worksheet
+Application.ScreenUpdating = False
+Set ws = Excel.ThisWorkbook.Sheets("Ashn Setting")
+Set fso = CreateObject("Scripting.FileSystemObject")
+MinDate = Date
+FoundNumber = 0
+SearchNumber = 0
+Set userSelection = Application.Selection
+FirstRow = userSelection.Cells(1, 1).Row
+lastrow = userSelection(userSelection.Count).Row
+ReDim ISArray(lastrow - FirstRow + 1, 8)
+
+For i = FirstRow To lastrow
+
+    If Trim(Cells(i, TA1Col)) = "" And Len(Cells(i, ISACol)) = ISAlen Then
+        For a = 4 To 7
+        'at here the cells(i,10) is for lobcod column
+            If ws.Cells(a, 1) = Cells(i, 2) Then
+                x = x + 1
+                ISArray(x, 7) = a
+                If MinDate > Format(Cells(i, DateCol).Value, "MM/DD/YYYY") Then
+                    MinDate = Format(Cells(i, DateCol).Value, "MM/DD/YYYY")
+                End If
+                ISArray(x, 0) = Cells(i, ISACol).Value      'ISA#
+                ISArray(x, 1) = Cells(i, fileCol).Value     'file name
+                ISArray(x, 2) = ws.Cells(a, 4)              '277CA location
+                ISArray(x, 3) = ws.Cells(a, 5)              '277CA Archive
+                Exit For
+            End If
+        Next a
+    End If
+Next i
+SearchNumber = x
+If ISArray(1, 0) <> "" Then
+    Call Get277file(MinDate)
+    For j = FirstRow To lastrow
+        For y = 1 To UBound(ISArray, 1)
+            If ISArray(y, 0) = Cells(j, ISACol) And ISArray(y, 4) <> "" Then
+                Cells(j, TA1Col) = ISArray(y, 4)                        '277CA file name
+                Cells(j, TA1Col + 1) = Format(ISArray(y, 5), "#")       'Number of accpet
+                Cells(j, TA1Col + 2) = Format(ISArray(y, 6), "#")       'Number of reject
+                Cells(j, TA1Col + 4) = Format(ISArray(y, 8), "#")
+                fso.MoveFile ISArray(y, 2) & "\" & ISArray(y, 4), ISArray(y, 3) & "\" & ISArray(y, 4)
+                If CLng(ISArray(y, 5)) + CLng(ISArray(y, 6)) <> 0 Then
+                    t = CLng(ISArray(y, 5)) + CLng(ISArray(y, 6))
+                    r = CLng(ISArray(y, 6))
+                    Cells(j, TA1Col + 3) = Format(r / t, "percent")
+                    If r / t = 1 Then
+                        Cells(j, TA1Col + 5) = "100% Rejected at 277CA level"
+                        Cells(j, TA1Col + 6) = "100% Rejected at 277CA level"
+                        Cells(j, TA1Col + 7) = Format(ISArray(y, 5), "#")
+                        Cells(j, TA1Col + 8) = Format(ISArray(y, 6), "#")
+                        Cells(j, TA1Col + 9) = Format(1 - r / t, "percent")
+                    End If
+                    If Cells(j, ISAlen + 1) = "FDA" Or Cells(j, ISAlen + 1) = "NSF" Then
+                        Dim Pipefile() As String
+                        Pipefile = Split(Cells(j, fileCol), "_")
+                        If Pipefile(5) = "MCD" Then
+                        'If Pipefile(2) = "MCD" Then
+                            Cells(j, TA1Col + 5) = "MCD Part - No MAO-001"
+                            Cells(j, TA1Col + 6) = "MCD Part - No MAO-002"
+                            Cells(j, TA1Col + 7) = Format(ISArray(y, 5), "#")
+                            Cells(j, TA1Col + 8) = Format(ISArray(y, 6), "#")
+                            Cells(j, TA1Col + 9) = Format(1 - r / t, "percent")
+                        End If
+                    End If
+                End If
+                
+                Exit For
+            End If
+        Next y
+    Next j
+Else: MsgBox "ISA number is not found or 277CA is already  in the selection!"
+End If
+Application.ScreenUpdating = True
+
+End Sub
+Sub Get277file(Rundate As Date)
+Dim fso As Scripting.FileSystemObject
+Dim SourceFolder As Scripting.Folder
+Dim FileItem As Scripting.File
+Dim i As Integer
+
+Set fso = New Scripting.FileSystemObject
+
+For i = 1 To SearchNumber
+    Dim FileDir As String
+    
+    Found = False
+    FileDir = ISArray(i, 2)
+    Set SourceFolder = fso.GetFolder(FileDir)
+    For Each FileItem In SourceFolder.Files
+        If FileItem.DateLastModified >= Rundate And Right(FileItem.Name, 5) = "277CA" Then
+            Call Search277CAFile(FileDir, FileItem.Name, i)
+            If Found Then
+                GoTo LastLine
+            End If
+        End If
+    Next FileItem
+    If Found Then
+        GoTo LastLine
+    Else
+        Dim SubFileDir As String
+        Dim SubSourceFolder As Scripting.Folder
+        Dim FolderItem As Scripting.Folder
+        
+        SubFileDir = ISArray(i, 3)
+        Set SubSourceFolder = fso.GetFolder(SubFileDir)
+        
+        For Each FolderItem In SubSourceFolder.SubFolders
+            If FolderItem.DateLastModified >= Rundate Then
+                Dim SubSourceFile As Scripting.Folder
+                Dim SubFileItem As Scripting.File
+                Set SubSourceFile = fso.GetFolder(FolderItem.Path)
+                For Each SubFileItem In SubSourceFile.Files
+                    If SubFileItem.DateLastModified >= Rundate And Right(SubFileItem.Name, 5) = "277CA" Then
+                        Call Search277CAFile(FolderItem.Path, SubFileItem.Name, i)
+                        If Found Then
+                            GoTo LastLine
+                        End If
+                    End If
+                Next SubFileItem
+            End If
+        Next FolderItem
+    End If
+LastLine:
+Next i
+End Sub
+
+Sub Search277CAFile(FileDir As String, filename As String, Arraynumber As Integer)
+
+Dim strFileName As String
+Dim strLine As String
+Dim i As Integer
+Dim j As Integer
+Dim LArray() As String
+Dim RArray() As String
+Dim FArray() As String
+Dim BArray() As String
+Dim ISANumber As String
+Dim accept As Long
+Dim reject As Long
+Dim result() As String
+reject = 0
+accept = 0
+strFileName = FileDir & "\" & filename
+Close #1
+Open strFileName For Input As #1
+
+    strLine = Input$(200, 1)
+    LArray = Split(strLine, "~", 2)
+    RArray = Split(LArray(0), "*")
+    If RArray(13) = ISArray(Arraynumber, 0) Then
+        Found = True
+        ISArray(Arraynumber, 4) = filename
+        
+        result = Split(ENC_True_Count(strFileName, "QTY*90*", "QTY*AA*", "TRN*1*0"), "|")
+        
+        ISArray(Arraynumber, 5) = result(0)
+        ISArray(Arraynumber, 6) = result(1)
+        ISArray(Arraynumber, 8) = result(2)
+        FoundNumber = FoundNumber + 1
+    End If
+Close #1
+End Sub
+
+Function ENC_True_Count(strFileName As String, strSearch_1 As String, strSearch_2 As String, strSearch_3 As String) As String
+    Dim StartLine As String
+    Dim Delimiter As String
+    Dim StartArray() As String
+    Dim strLine As String
+    Dim BArray() As String
+    Dim j As Long
+    Dim test As Long
+    Dim accept As Long
+    Dim reject As Long
+    Dim Zero_Count As Long
+    Dim Correct As Long
+    
+    Close #1
+    Open strFileName For Input As #1
+    Line Input #1, StartLine
+    Delimiter = "*"
+    StartArray = Split(StartLine, "~")
+    For j = 0 To UBound(StartArray) - 1
+        strLine = StartArray(j)
+        If Left(strLine, 7) = strSearch_1 Then
+            BArray = Split(strLine, Delimiter)
+            accept = accept + BArray(2)
+        ElseIf Left(strLine, 7) = strSearch_2 Then
+            BArray = Split(strLine, Delimiter)
+            reject = reject + BArray(2)
+        ElseIf strLine = strSearch_3 Then
+            Zero_Count = Zero_Count + 1
+        End If
+    Next j
+    Correct = accept + reject - Zero_Count
+    Close #1
+    ENC_True_Count = accept & "|" & reject & "|" & Correct
+
+
+End Function
+
+'=======================================================================================================================================
+' since i need to get true cound of CMS 277CA for the TRN*1*0~ issue, i need to abundant this function, otherwise it will be inefficient
+'=======================================================================================================================================
+
+Function EncounterCount(strFileName As String, strSearchText As String) As String
+'Set a Reference to the Microsoft Scripting Runtime Library
+Dim objFSO As FileSystemObject
+Dim ts As TextStream
+Dim strText As String
+Dim lngPos As Long
+Dim lngStringCount As Long
+Dim accept As Long
+Dim reject As Long
+
+'Create instance of FileSystemObject.
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+Set ts = objFSO.OpenTextFile(strFileName, ForReading)
+
+'Read entire contents of file, save to strText variable
+strText = ts.ReadAll
+
+lngPos = 1
+
+Do
+    Dim temp() As String
+    Dim subtemp1() As String
+    Dim subtemp2() As String
+    lngPos = InStr(lngPos, strText, strSearchText)
+    If lngPos > 0 Then
+        temp() = Split(Mid(strText, lngPos, 50), "~")
+        subtemp1() = Split(temp(0), "*")
+        subtemp2() = Split(temp(1), "*")
+        If subtemp1(1) = "90" Then
+            accept = accept + subtemp1(2)
+            If subtemp2(1) = "AA" Then
+                reject = reject + subtemp2(2)
+            End If
+        ElseIf subtemp1(1) = "AA" Then
+            reject = reject + subtemp1(2)
+        End If
+        lngPos = lngPos + 50
+    End If
+Loop Until lngPos = 0
+
+EncounterCount = accept & "|" & reject
+
+End Function
+
+
+
+
+
