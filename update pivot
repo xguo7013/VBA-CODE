@@ -1,0 +1,285 @@
+
+
+Sub update()
+
+Dim actbook As Workbook
+
+
+
+
+Call Module1.openDialog
+
+ActiveWorkbook.Worksheets(1).Range("G2").Value = Worksheets(3).Range("F2").Value
+ActiveWorkbook.Worksheets(2).Range("D6").Value = Worksheets(3).Range("F2").Value
+
+
+MsgBox "Please update the Pivot tables Manually"
+
+Call Load_check
+Call Module2.mao_002_dup
+
+
+End Sub
+
+
+Sub save_book()
+
+Sheet3.Activate
+
+ActiveWorkbook.SaveCopyAs "\\sv-hfi-014\Analysis\Encounter_Reporting\NY\PHSP_Encounters\Reconcilations\DWH_Load_Rec\archive\CMS DWH Load Report " + Format(ActiveSheet.Range("g2").Value, "yyyymmdd") + ".xlsm"
+ActiveWorkbook.SaveAs Filename:="\\sv-hfi-014\Analysis\Encounter_Reporting\NY\PHSP_Encounters\Reconcilations\DWH_Load_Rec\CMS DWH Load Report.xlsm"
+ActiveWorkbook.Save
+
+
+
+End Sub
+
+
+
+
+
+
+
+Sub AdjustPivotDataRange()
+'PURPOSE: Automatically readjust a Pivot Table's data source range
+'SOURCE: www.TheSpreadsheetGuru.com/The-Code-Vault
+
+Dim Data_sht As Worksheet
+Dim Pivot_sht As Worksheet
+Dim StartPoint As Range
+Dim DataRange As Range
+Dim PivotName As String
+Dim NewRange As String
+Dim lastrow As Integer
+
+
+'Set Variables Equal to Data Sheet and Pivot Sheet
+  Set Data_sht = ThisWorkbook.Worksheets(2)
+  Set Pivot_sht = ThisWorkbook.Worksheets(3)
+
+lastrow = Data_sht.Cells(Data_sht.Rows.Count, "a").End(xlUp).Row
+
+'Enter in Pivot Table Name
+  PivotName = "PivotTable20"
+
+'Dynamically Retrieve Range Address of Data
+  Set StartPoint = Data_sht.Range("A1")
+  Set DataRange = Data_sht.Range(StartPoint, "AE" & lastrow)
+  
+  NewRange = Data_sht.Name & "!" & _
+    DataRange.Address(ReferenceStyle:=xlR1C1)
+
+'Make sure every column in data set has a heading and is not blank (error prevention)
+  If WorksheetFunction.CountBlank(DataRange.Rows(1)) > 0 Then
+    MsgBox "One of your data columns has a blank heading." & vbNewLine _
+      & "Please fix and re-run!.", vbCritical, "Column Heading Missing!"
+    Exit Sub
+  End If
+
+'Change Pivot Table Data Source Range Address
+  Pivot_sht.PivotTables(PivotName).ChangePivotCache _
+    ThisWorkbook.PivotCaches.Create( _
+    SourceType:=xlDatabase, _
+    SourceData:=NewRange)
+      
+'Ensure Pivot Table is Refreshed
+  Pivot_sht.PivotTables(PivotName).RefreshTable
+
+'Complete Message
+  MsgBox PivotName & "'s data source range has been successfully updated!"
+  
+ Call AdjustPivotDataRange_2
+ 
+End Sub
+
+
+
+Sub AdjustPivotDataRange_2()
+'PURPOSE: Automatically readjust a Pivot Table's data source range
+'SOURCE: www.TheSpreadsheetGuru.com/The-Code-Vault
+
+Dim Data_sht As Worksheet
+Dim Pivot_sht As Worksheet
+Dim StartPoint As Range
+Dim DataRange As Range
+Dim PivotName As String
+Dim NewRange As String
+Dim lastrow As Integer
+
+
+'Set Variables Equal to Data Sheet and Pivot Sheet
+  Set Data_sht = ThisWorkbook.Worksheets(2)
+  Set Pivot_sht = ThisWorkbook.Worksheets(3)
+
+lastrow = Data_sht.Cells(Data_sht.Rows.Count, "a").End(xlUp).Row
+
+'Enter in Pivot Table Name
+  PivotName = "PivotTable21"
+
+'Dynamically Retrieve Range Address of Data
+  Set StartPoint = Data_sht.Range("A1")
+  Set DataRange = Data_sht.Range(StartPoint, "AE" & lastrow)
+  
+  NewRange = Data_sht.Name & "!" & _
+    DataRange.Address(ReferenceStyle:=xlR1C1)
+
+'Make sure every column in data set has a heading and is not blank (error prevention)
+  If WorksheetFunction.CountBlank(DataRange.Rows(1)) > 0 Then
+    MsgBox "One of your data columns has a blank heading." & vbNewLine _
+      & "Please fix and re-run!.", vbCritical, "Column Heading Missing!"
+    Exit Sub
+  End If
+
+'Change Pivot Table Data Source Range Address
+  Pivot_sht.PivotTables(PivotName).ChangePivotCache _
+    ThisWorkbook.PivotCaches.Create( _
+    SourceType:=xlDatabase, _
+    SourceData:=NewRange)
+      
+'Ensure Pivot Table is Refreshed
+  Pivot_sht.PivotTables(PivotName).RefreshTable
+
+'Complete Message
+  MsgBox PivotName & "'s data source range has been successfully updated!"
+  
+  Worksheets(3).Range("f2").Value = Worksheets(1).Range("F2").Value
+  Worksheets(3).Range("f12").Value = Worksheets(1).Range("F2").Value
+  Worksheets(3).Range("f23").Value = Worksheets(1).Range("F2").Value
+  Worksheets(3).Range("f35").Value = Worksheets(1).Range("F2").Value
+
+End Sub
+
+
+
+
+Sub AdjustPivotDataRange_3()
+'PURPOSE: Automatically readjust a Pivot Table's data source range
+'SOURCE: www.TheSpreadsheetGuru.com/The-Code-Vault
+
+Dim Data_sht As Worksheet
+Dim Pivot_sht As Worksheet
+Dim StartPoint As Range
+Dim DataRange As Range
+Dim PivotName As String
+Dim NewRange As String
+Dim lastrow As Integer
+
+
+'Set Variables Equal to Data Sheet and Pivot Sheet
+  Set Data_sht = ThisWorkbook.Worksheets(2)
+  Set Pivot_sht = ThisWorkbook.Worksheets(3)
+
+lastrow = Data_sht.Cells(Data_sht.Rows.Count, "a").End(xlUp).Row
+
+'Enter in Pivot Table Name
+  PivotName = "PivotTable22"
+
+'Dynamically Retrieve Range Address of Data
+  Set StartPoint = Data_sht.Range("A1")
+  Set DataRange = Data_sht.Range(StartPoint, "AE" & lastrow)
+  
+  NewRange = Data_sht.Name & "!" & _
+    DataRange.Address(ReferenceStyle:=xlR1C1)
+
+'Make sure every column in data set has a heading and is not blank (error prevention)
+  If WorksheetFunction.CountBlank(DataRange.Rows(1)) > 0 Then
+    MsgBox "One of your data columns has a blank heading." & vbNewLine _
+      & "Please fix and re-run!.", vbCritical, "Column Heading Missing!"
+    Exit Sub
+  End If
+
+'Change Pivot Table Data Source Range Address
+  Pivot_sht.PivotTables(PivotName).ChangePivotCache _
+    ThisWorkbook.PivotCaches.Create( _
+    SourceType:=xlDatabase, _
+    SourceData:=NewRange)
+      
+'Ensure Pivot Table is Refreshed
+  Pivot_sht.PivotTables(PivotName).RefreshTable
+
+'Complete Message
+  MsgBox PivotName & "'s data source range has been successfully updated!"
+  
+
+End Sub
+
+
+Sub AdjustPivotDataRange_4()
+'PURPOSE: Automatically readjust a Pivot Table's data source range
+'SOURCE: www.TheSpreadsheetGuru.com/The-Code-Vault
+
+Dim Data_sht As Worksheet
+Dim Pivot_sht As Worksheet
+Dim StartPoint As Range
+Dim DataRange As Range
+Dim PivotName As String
+Dim NewRange As String
+Dim lastrow As Integer
+
+
+'Set Variables Equal to Data Sheet and Pivot Sheet
+  Set Data_sht = ThisWorkbook.Worksheets(1)
+  Set Pivot_sht = ThisWorkbook.Worksheets(3)
+
+lastrow = Data_sht.Cells(Data_sht.Rows.Count, "a").End(xlUp).Row
+
+'Enter in Pivot Table Name
+  PivotName = "PivotTable23"
+
+'Dynamically Retrieve Range Address of Data
+  Set StartPoint = Data_sht.Range("A1")
+  Set DataRange = Data_sht.Range(StartPoint, "V" & lastrow)
+  
+  NewRange = Data_sht.Name & "!" & _
+    DataRange.Address(ReferenceStyle:=xlR1C1)
+
+'Make sure every column in data set has a heading and is not blank (error prevention)
+  If WorksheetFunction.CountBlank(DataRange.Rows(1)) > 0 Then
+    MsgBox "One of your data columns has a blank heading." & vbNewLine _
+      & "Please fix and re-run!.", vbCritical, "Column Heading Missing!"
+    Exit Sub
+  End If
+
+'Change Pivot Table Data Source Range Address
+  Pivot_sht.PivotTables(PivotName).ChangePivotCache _
+    ThisWorkbook.PivotCaches.Create( _
+    SourceType:=xlDatabase, _
+    SourceData:=NewRange)
+      
+'Ensure Pivot Table is Refreshed
+  Pivot_sht.PivotTables(PivotName).RefreshTable
+
+'Complete Message
+  MsgBox PivotName & "'s data source range has been successfully updated!"
+  
+
+End Sub
+
+
+
+Sub Load_check()
+
+Dim i As Integer
+Dim lastrow As Integer
+Set Data_sht = Worksheets("CMS IN")
+
+ThisWorkbook.Worksheets("Pivot").Range("M1").Clear
+
+Worksheets("CMS IN").Activate
+lastrow = Data_sht.Cells(Data_sht.Rows.Count, "a").End(xlUp).Row
+
+
+For i = 2 To lastrow
+    If Cells(i, "B").Value <> Cells(i, "Q").Value Then
+            MsgBox Cells(i, "A").Value & "is loaded in to wrong table!"
+            MsgBox "Please check the Pivot tab, cell(M1)for the ISANO"
+            Worksheets("Pivot").Range("M1").Value = Cells(i, "A").Value
+     Else
+    
+     End If
+Next
+
+
+
+End Sub
+
