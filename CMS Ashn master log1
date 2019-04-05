@@ -1,0 +1,122 @@
+Option Explicit
+Private Sub Workbook_BeforeClose(Cancel As Boolean)
+On Error Resume Next ' ignore possible errors
+    If Not ActiveWorkbook.ReadOnly = True Then
+        'only try to delete the file if the user has it locked
+        Kill ThisWorkbook.Path & "\CmsAshnUsage.log" ' delete the file if it exists and it is possible
+    End If
+    
+On Error GoTo 0 ' break on errors
+End Sub
+
+
+
+
+Private Sub Workbook_BeforeSave(ByVal SaveAsUI As Boolean, Cancel As Boolean)
+
+Dim setting As Excel.Worksheet
+Dim Ashn As Excel.Worksheet
+Dim lastrow As Long
+Set setting = Excel.ThisWorkbook.Sheets("Ashn Setting")
+Set Ashn = Excel.ThisWorkbook.Sheets("Ashn")
+lastrow = Ashn.Cells.Find("*", [A1], , , xlByRows, xlPrevious).Row
+setting.Cells(1, 2) = lastrow
+    
+'Auto backup the log in Josh's personal folder
+If SaveAsUI = False Then
+    Dim Logname As String
+    Logname = ThisWorkbook.Name
+    Application.DisplayAlerts = False
+    ThisWorkbook.SaveCopyAs filename:="Xguo\Master log testing files\CMS Ashn testing\Log back up\" & Logname
+    Application.DisplayAlerts = True
+End If
+End Sub
+
+
+Private Sub Workbook_Open()
+Dim file1 As Integer
+Dim strLine As String
+file1 = FreeFile
+    If Not ActiveWorkbook.ReadOnly = True Then
+        'only add name to the usage log if the user has it locked
+        Open ThisWorkbook.Path & "\CmsAshnUsage.log" For Append As #file1
+        Print #file1, Environ("USERNAME")
+        Close #file1
+    Else
+        'if someone else has the file open, find out who
+        Open ThisWorkbook.Path & "\ashnusage.log" For Input Access Read As #file1
+            Do While Not EOF(file1)
+               Line Input #file1, strLine
+            Loop
+        Close #file1
+        Select Case strLine
+       Case "xiguo"
+          strLine = ""
+       Case "gchan"
+          strLine = ""
+       Case "wchung"
+          strLine = ""
+       Case "jhildebrand"
+          strLine = ""
+       Case "gwong"
+           strLine = ""
+       Case "rmiller"
+          strLine = ""
+       Case "hrhu"
+          strLine = ""
+       Case "rcannon"
+          strLine = ""
+       Case "PrKandasamy"
+          strLine = " "
+          
+       Case Else
+          strLine = strLine
+     End Select
+     
+        MsgBox "The file was locked by following user: " & strLine 'last line of file"
+    End If
+
+
+Call Layout(2, "Ashn", "Table1", "U")
+End Sub
+
+Sub Layout(col As Integer, tabname As String, tablename As String, letter As String)
+Dim ws As Excel.Worksheet
+Dim setting As Excel.Worksheet
+Dim lastrow As Long
+Dim Prerow As Long
+Dim x As Integer
+Set ws = Excel.ThisWorkbook.Sheets(tabname)
+Set setting = Excel.ThisWorkbook.Sheets("Ashn Setting")
+lastrow = ws.Cells.Find("*", [A1], , , xlByRows, xlPrevious).Row
+Prerow = setting.Cells(1, col).Value
+x = 25 + col
+If lastrow > Prerow Then
+'    setting.Rows(x & ":" & x).Copy
+'    ws.Rows(Prerow + 1 & ":" & Lastrow).PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+'        SkipBlanks:=False, Transpose:=False
+'    Application.CutCopyMode = False
+
+'    ----------------------------------------------------------------------------------------------------
+'    New change on 08/05/2016 --> to void the stupid picture error message pop up on every close if there is new entry
+'    ----------------------------------------------------------------------------------------------------
+
+'    ----------------------------------------------------------------------------------------------------
+    ws.ListObjects(tablename).Resize Range("$A$1:$" & letter & "$" & lastrow)
+    setting.Cells(1, col).Value = lastrow
+    Application.CutCopyMode = False
+    
+    With ws.Range("$A$" & Prerow + 1 & ":$" & letter & "$" & lastrow).Interior
+        .Pattern = xlNone
+        .TintAndShade = 0
+        .PatternTintAndShade = 0
+    End With
+    
+    Application.DisplayAlerts = False
+    ThisWorkbook.Save
+    Application.DisplayAlerts = True
+End If
+End Sub
+
+
+
