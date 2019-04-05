@@ -1,0 +1,189 @@
+Option Explicit
+Dim ISArray() As String
+Dim SearchNumber As Integer
+Dim FoundNumber As Integer
+Dim Found As Boolean
+Sub MAO2_Medicare()
+Call Selection_MAO2(16, 3, 9, 5, 6)
+'mao_002 column, ISA column, ISA length, submission date, file name column
+
+End Sub
+
+'Sub TribleNine_Medical_PH()
+'Call Selection_999(8, 2, 7, 4,"PDP")
+'End Sub
+
+Sub Selection_MAO2(TA1Col As Integer, ISACol As Integer, ISAlen As Integer, DateCol As Integer, fileCol As Integer)
+Dim userSelection As Range
+Dim FirstRow As Integer
+Dim lastrow As Integer
+Dim Count As Integer
+Dim MinDate As Date
+Dim ISA As String
+Dim i As Integer
+Dim j As Integer
+Dim x As Integer
+Dim y As Integer
+Dim ws As Worksheet
+Dim t As Integer
+Dim fso As Scripting.FileSystemObject
+Application.ScreenUpdating = False
+Set ws = Excel.ThisWorkbook.Sheets("Ashn Setting")
+Set fso = New Scripting.FileSystemObject
+MinDate = Date
+FoundNumber = 0
+SearchNumber = 0
+Set userSelection = Application.Selection
+FirstRow = userSelection.Cells(1, 1).Row
+lastrow = userSelection(userSelection.Count).Row
+ReDim ISArray(lastrow - FirstRow + 1, 8)
+
+For i = FirstRow To lastrow
+
+    If Trim(Cells(i, TA1Col)) = "" And Len(Cells(i, ISACol)) = ISAlen Then
+        For t = 4 To 6
+            If ws.Cells(t, 1) = Cells(i, 2) Then
+                x = x + 1
+                ISArray(x, 7) = t
+                If MinDate > Format(Cells(i, DateCol).Value, "MM/DD/YYYY") Then
+                    MinDate = Format(Cells(i, DateCol).Value, "MM/DD/YYYY")
+                End If
+                ISArray(x, 0) = Cells(i, ISACol).Value
+                ISArray(x, 2) = Cells(i, fileCol).Value
+                If Left(Cells(i, fileCol), 4) = "837i" Then
+                    ISArray(x, 3) = ws.Cells(t, 8)
+                    
+                ElseIf Left(Cells(i, fileCol), 4) = "837p" Then
+                    ISArray(x, 3) = ws.Cells(t, 8)
+                    
+                Else
+                    ISArray(x, 3) = ws.Cells(t, 8)
+                    
+                End If
+            End If
+        Next t
+    End If
+Next i
+SearchNumber = x
+If ISArray(1, 0) <> "" Then
+    Call GetMAO2file(MinDate)
+    For j = FirstRow To lastrow
+        For y = 1 To UBound(ISArray, 1)
+            ISA = Cells(j, ISACol).Value
+            If ISA = ISArray(y, 0) And ISArray(y, 4) <> "" Then
+                Cells(j, TA1Col) = ISArray(y, 4)
+                Cells(j, TA1Col + 1) = CLng(ISArray(y, 5))
+                Cells(j, TA1Col + 2) = CLng(ISArray(y, 6))
+                Cells(j, TA1Col + 3) = Format(CLng(ISArray(y, 5)) / CLng(Cells(j, 7)), "percent")
+                'cells(j,7) is the number of encounters column
+                fso.MoveFile ISArray(y, 3) & "\" & ISArray(y, 4), ws.Cells(4, 9) & "\" & ISArray(y, 4)
+                Exit For
+            End If
+        Next y
+    Next j
+Else: MsgBox "ISA number is not found or 999 is already  in the selection!"
+End If
+Application.ScreenUpdating = True
+
+End Sub
+Sub GetMAO2file(Rundate As Date)
+Dim fso As Scripting.FileSystemObject
+Dim SourceFolder As Scripting.Folder
+Dim FileItem As Scripting.File
+Dim i As Integer
+
+Set fso = New Scripting.FileSystemObject
+
+For i = 1 To SearchNumber
+    Dim FileDir As String
+    
+    Found = False
+    FileDir = ISArray(i, 3)
+    Set SourceFolder = fso.GetFolder(FileDir)
+    For Each FileItem In SourceFolder.Files
+        If FileItem.DateLastModified >= Rundate And (Left(FileItem.Name, 3) = "ENH" Or Left(FileItem.Name, 3) = "DNY" Or Left(FileItem.Name, 3) = "RPT") Then
+            Call SearchMAO2File(FileDir, FileItem.Name, i)
+            If Found Then
+                GoTo LastLine
+            End If
+        End If
+    Next FileItem
+LastLine:
+Next i
+End Sub
+
+
+'this piece of code will take too long to read only first line, since 837 format is a long line.
+
+'Function SearchTextFile(ISN As String, FileDir As String, FileName As String) As Boolean
+'    Dim strFileName As String
+'    Dim strLine As String
+'    Dim strSearch As String
+'    Dim f As Integer
+'    Dim lngLine As Long
+'    Dim blnFound As Boolean
+'    f = FreeFile
+'    strFileName = FileDir & FileName
+'    strSearch = ISN
+'    Open strFileName For Input As #f
+'    Do While Not EOF(f)
+'        lngLine = lngLine + 1
+'        Line Input #f, strLine
+'        strLine = Left(strLine, 200)
+'        If InStr(1, strLine, strSearch, vbBinaryCompare) > 0 Then
+'            blnFound = True
+'            Exit Do
+'        End If
+'        Exit Do
+'    Loop
+'    Close #f
+'    If blnFound Then
+'        SearchTextFile = True
+'    Else
+'        SearchTextFile = False
+'    End If
+'End Function
+
+Sub SearchMAO2File(FileDir As String, filename As String, Arraynumber As Integer)
+
+Dim strFileName As String
+Dim strLine As String
+Dim i As Integer
+Dim start() As String
+Dim LArray() As String
+Dim BArray() As String
+Dim match As Boolean
+Dim x As Integer
+Dim stloop(10, 2) As String
+Dim Rejection As String
+Dim Correct As Boolean
+
+x = 1
+Correct = False
+match = False
+strFileName = FileDir & "\" & filename
+Close #1
+Open strFileName For Input As #1
+Do While Not EOF(1)
+    Line Input #1, strLine
+    If Correct = False Then
+        If InStr(strLine, ISArray(Arraynumber, 0)) > 0 Then
+            ISArray(Arraynumber, 4) = filename
+            Correct = True
+        Else: Exit Do
+        End If
+    Else
+        If Left(strLine, 10) = "9*MAO-002*" Then
+            Dim result() As String
+            result = Split(strLine, "*")
+            ISArray(Arraynumber, 5) = result(6)
+            ISArray(Arraynumber, 6) = result(7)
+            Exit Do
+        End If
+    End If
+Loop
+Close #1
+End Sub
+
+
+
