@@ -1,0 +1,194 @@
+'this is the OUT button code only
+Dim ISArray() As String
+Dim totalcount As Long
+Dim Okcount As Long
+
+Option Explicit
+Sub Outbound_run()
+Dim answer As Integer
+Dim start As Double
+Dim finish As Double
+Dim Question As Integer
+Dim fs As Scripting.FileSystemObject
+Dim Trigger As Object
+
+Set fs = CreateObject("Scripting.FileSystemObject")
+answer = MsgBox("Please make sure Vendor control table is not locked?", vbYesNo, "Continue???")
+totalcount = 0 'this is counting how  many files need to be loaded for the outbound
+               ' it can be referred to the load_outbound function, for loops
+Okcount = 0
+
+    If answer = vbYes Then
+        start = Timer
+        Call Load_outbound("Ashn", 20, 8, 10, 3, 6, 1, 2)
+        '20 the Out Column
+        '9 TA1 status no long need for this CMS Ashn  TA1 is for APD Ashn
+        '8 999 search
+        '10 277CA Search
+        '3 IASNO     6 file name  1 company number   2 lobcod
+        
+        finish = Timer
+        If Okcount = 0 Then
+            MsgBox "Done !!!  " & "Time : " & Round(finish - start, 0) & vbNewLine & "Outbound : OK! = " & Okcount & " || Failed = " & totalcount - Okcount
+        Else
+           MsgBox "Done !!!  " & "Time : " & Round(finish - start, 0) & vbNewLine & "Outbound : OK! = " & Okcount & " || Failed = " & totalcount - Okcount
+           MsgBox "You have to manually pull the trigger!", vbCritical
+           
+        'Question = MsgBox("Done !!!  " & "Time : " & Round(finish - start, 0) & vbNewLine & "Outbound : OK! = " & Okcount & " || Failed = " & totalcount - Okcount & vbNewLine & "Do you want to pull the trigger for outbound load process now?", vbYesNo, "Pull The Trigger???")
+            'If Question = vbYes Then
+                'Set Trigger = fs.CreateTextFile("\\sv-hfi-014\Analysis\Personal Drives - Current\Xguo\Master log testing files\CMS Ashn testing\CMS Outbound Trigger\ASHNtrigger.txt", True)
+            'End If
+        End If
+    End If
+End Sub
+
+Sub Load_outbound(tabname As String, Outbound_pos As Integer, Tri9_pos As Integer, Two77CA_pos As Integer, ISA_pos As Integer, file_pos As Integer, comp_pos As Integer, lob_pos As Integer)
+Dim Sheet As Excel.Worksheet
+Dim ws As Excel.Worksheet
+Dim lastrow As Long
+Dim i As Long
+Dim x As Long
+Dim q As Long
+ReDim ISArray(5, 0)
+Dim Control_loc As String
+
+Set Sheet = ThisWorkbook.Worksheets(tabname) 'Ashn
+Set ws = Excel.ThisWorkbook.Sheets("Ashn Setting") 'ws is Setting
+
+lastrow = Sheet.Cells.Find("*", [A1], , , xlByRows, xlPrevious).Row
+x = 0
+Control_loc = ws.Cells(9, 2) 'job master location
+
+For i = 2 To lastrow 'lastrow of the whole master log
+
+    If IsEmpty(Sheet.Cells(i, Outbound_pos).Value) Then 'if outbound is empty, TA1 status is empty, or is 'A' or is Not
+        
+            If Not IsEmpty(Sheet.Cells(i, Tri9_pos).Value) And Not Sheet.Cells(i, Tri9_pos + 1) = "R" Then
+                If Not IsEmpty(Sheet.Cells(i, Two77CA_pos).Value) Then 'if 277 is not empty
+                    If IsEmpty(Sheet.Cells(i, 16).Value) Then
+                       Sheet.Cells(i, Outbound_pos).Value = ""
+                    Else:
+                      
+                    x = x + 1
+                    ReDim Preserve ISArray(5, x)
+                    ISArray(1, x) = i                                   'row#
+                    ISArray(2, x) = Sheet.Cells(i, ISA_pos).Value       'ISA#
+                    ISArray(3, x) = Sheet.Cells(i, file_pos).Value      'filename
+                    ISArray(4, x) = Sheet.Cells(i, comp_pos).Value      'comp#
+                    ISArray(5, x) = Sheet.Cells(i, lob_pos).Value       'Lobcod
+                    
+                    End If
+                End If
+            Else: Sheet.Cells(i, Outbound_pos) = "999ed"
+            End If
+        
+    End If
+Next i
+
+totalcount = x
+
+If x > 0 Then
+    If IsFileOpen(Control_loc) Then
+        MsgBox "The Medial Control log is locked by someone!"
+    Else
+        Call update_control(Control_loc, tabname, Outbound_pos, "WRPT_FNL")
+    End If
+End If
+
+End Sub
+
+
+Sub update_control(Control_loc As String, tabname As String, Outbound_pos As Integer, controlname As String)
+
+Dim rs As New ADODB.Recordset
+Dim cnn As New ADODB.Connection
+
+Dim i As Long
+Dim y As Long
+Dim Archive As String
+Dim Sheet As Excel.Worksheet
+Dim ws As Excel.Worksheet
+Dim today As String
+Dim tday As String
+Dim fso As Scripting.FileSystemObject
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set Sheet = ThisWorkbook.Worksheets(tabname)
+Set ws = Excel.ThisWorkbook.Sheets("Ashn Setting")
+today = Format(Date, "MM-DD-YYYY")
+tday = Format(Date, "MM/DD/YYYY")
+
+With cnn
+    .Provider = "Microsoft.ACE.OLEDB.12.0"
+    .Properties("Extended Properties").Value = "Excel 12.0"
+    .Open (Control_loc)
+End With
+
+For i = 1 To totalcount
+    Dim QueryStr As String
+    Dim filen As String
+    Dim j As Long
+    
+    filen = ISArray(3, i)
+    j = ISArray(1, i)
+    
+    Archive = ws.Cells(10, 2) & "\" & filen
+    If Not IsEmpty(filen) And IsFileExists(Archive) Then
+        Dim Destination As String
+        Dim lobcod As String
+        If ISArray(4, i) = "34" Or ISArray(4, i) = "30" Then
+            lobcod = ISArray(5, i)
+        Else: lobcod = ""
+        End If
+        Destination = ws.Cells(11, 2) & "\" & filen
+        QueryStr = "Insert into [" & controlname & "$]" & " ([Vendor],[output_file_name],[output_dataset_name]," & _
+                    "[load_flag],[treo_flag], [archive_date], [Compno], [lobcod]," & "[ISA13])" & _
+                    "values ('CHIRO','" & filen & "','" & filen & "','Y','N" & _
+                    "','" & "" & "','" & ISArray(4, i) & "','" & lobcod & "','" & ISArray(2, i) & "')"  'leave the archive_date blank, the system will put the value in the column
+                                                                                                        'the APD master log needs to insert the date value by VBA, CMS does not need
+        cnn.Execute (QueryStr)
+        fso.MoveFile Archive, Destination
+        Sheet.Cells(j, Outbound_pos) = tday
+        Sheet.Range(Cells(j, 1), Cells(j, Outbound_pos + 1)).Interior.Color = 15773696
+        Okcount = Okcount + 1
+    End If
+Next i
+
+cnn.Close
+Set cnn = Nothing
+End Sub
+
+
+
+
+Function IsFileOpen(filename As String)
+Dim iFilenum As Long
+Dim iErr As Long
+
+On Error Resume Next
+iFilenum = FreeFile()
+Open filename For Input Lock Read As #iFilenum
+Close iFilenum
+iErr = Err
+On Error GoTo 0
+
+Select Case iErr
+Case 0: IsFileOpen = False
+Case 70: IsFileOpen = True
+Case Else: Error iErr
+End Select
+End Function
+
+Function IsFileExists(location As String) As Boolean
+If Right(location, 1) = "\" Then
+    IsFileExists = False
+Else
+    If Dir(location) <> "" Then
+        IsFileExists = True
+    Else
+        IsFileExists = False
+    End If
+End If
+End Function
+
+
