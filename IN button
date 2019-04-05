@@ -1,0 +1,162 @@
+'this module is for IN button
+'2/25/2019  Sean first version
+
+Dim totalcount_277CA As Integer
+Dim totalcount_MAO001 As Integer
+Dim totalcount_MAO002 As Integer
+Dim Okcount_277CA  As Integer
+Dim Okcount_MAO001 As Integer
+Dim Okcount_MAO002 As Integer
+
+
+Sub Inbound_run()
+Dim answer As Integer
+Dim start As Double
+Dim finish As Double
+Dim Question As Integer
+'Dim fs As Scripting.FileSystemObject
+Dim Trigger As Object
+
+'Set fs = CreateObject("Scripting.FileSystemObject")
+
+
+answer = MsgBox("Please make sure the CMS Outbounds are fully loaded?", vbYesNo, "Continue???")
+totalcount_277CA = 0
+totalcount_MAO001 = 0
+totalcount_MAO002 = 0
+Okcount_277CA = 0
+Okcount_MAO001 = 0
+Okcount_MAO002 = 0
+If answer = vbYes Then
+    start = Timer
+    'Ashn is the tab name
+    '20 outbound column position
+    '21 In button column position
+    '10 277CA column
+    '15 MAO_001
+    '16 MAO_002
+    
+    
+    Call Load_inbound("Ashn", 20, 21, 10, "277CA")
+    Call Load_inbound("Ashn", 20, 21, 15, "MAO-001")
+    Call Load_inbound("Ashn", 20, 21, 16, "MAO-002")
+    finish = Timer
+    If Okcount_277CA + Okcount_MAO001 + Okcount_MAO002 = 0 Then
+        MsgBox "Done !!!  " & "Time : " & Round(finish - start, 0) & vbNewLine & "277CA : OK! = " & Okcount_277CA & " || Failed = " & totalcount_277CA - Okcount_277CA _
+        & vbNewLine & "MAO-001 : OK! = " & Okcount_MAO001 & " || Failed = " & totalcount_MAO001 - Okcount_MAO001 _
+        & vbNewLine & "MAO-002 : OK! = " & Okcount_MAO002 & " || Failed = " & totalcount_MAO002 - Okcount_MAO002
+    Else
+        MsgBox "Done !!!  " & "Time : " & Round(finish - start, 0) & vbNewLine & "277CA : OK! = " & Okcount_277CA & " || Failed = " & totalcount_277CA - Okcount_277CA _
+        & vbNewLine & "MAO-001 : OK! = " & Okcount_MAO001 & " || Failed = " & totalcount_MAO001 - Okcount_MAO001 _
+        & vbNewLine & "MAO-002 : OK! = " & Okcount_MAO002 & " || Failed = " & totalcount_MAO002 - Okcount_MAO002
+    End If
+        MsgBox "You have to manually pull the trigger!", vbCritical
+        
+    'Question = MsgBox("Done !!!  " & "Time : " & Round(finish - start, 0) & vbNewLine & "Outbound : OK! = " & Okcount & " || Failed = " & totalcount - Okcount & vbNewLine & "Do you want to pull the trigger for inbound load process now?", vbYesNo, "Pull The Trigger???")
+            'If Question = vbYes Then
+                'Set Trigger = fs.CreateTextFile("\\sv-hfi-014\Analysis\Personal Drives - Current\Xguo\Master log testing files\CMS Ashn testing\CMS Ashn Inbound Trigger\ASHNtrigger(IN).txt", True)
+            'End If
+       
+End If
+
+
+
+
+End Sub
+
+
+Sub Load_inbound(tabname As String, Outbound_pos As Integer, Inbound_pos As Integer, response_pos As Integer, resptyp As String)
+Dim Sheet As Excel.Worksheet
+Dim ws As Excel.Worksheet
+Dim lastrow As Long
+Dim i As Long
+Dim Source As String
+Dim Destination As String
+Dim fso As Scripting.FileSystemObject
+
+Set Sheet = ThisWorkbook.Worksheets(tabname)
+Set ws = Excel.ThisWorkbook.Sheets("Ashn Setting")
+Set fso = CreateObject("Scripting.FileSystemObject")
+lastrow = Sheet.Cells.Find("*", [A1], , , xlByRows, xlPrevious).Row
+
+For i = 1 To lastrow
+    If IsEmpty(Sheet.Cells(i, Inbound_pos).Value) Then
+        If Not IsEmpty(Sheet.Cells(i, Outbound_pos).Value) Then
+            If Sheet.Cells(i, Outbound_pos) = "999ed" Or Sheet.Cells(i, Outbound_pos) = "RJed" Or Sheet.Cells(i, Outbound_pos) = "TA1 Rejected" Then
+                Sheet.Cells(i, Inbound_pos) = Sheet.Cells(i, Outbound_pos)
+            ElseIf Sheet.Range(Cells(i, Outbound_pos), Cells(i, Outbound_pos)).Interior.Color = 15773696 Then
+                If Left(Sheet.Cells(i, response_pos), 3) = "RSP" Or Left(Sheet.Cells(i, response_pos), 3) = "RPT" Or Left(Sheet.Cells(i, response_pos), 3) = "DNY" Or Left(Sheet.Cells(i, response_pos), 3) = "ENH" Or Left(Sheet.Cells(i, response_pos), 3) = "MCD" Or Left(Sheet.Cells(i, response_pos), 3) = "100" Then
+                    If resptyp = "277CA" Then
+                        Source = ws.Cells(4, 5) & "\" & Cells(i, response_pos)
+                        totalcount_277CA = totalcount_277CA + 1
+                        If IsFileExists(Source) Then
+                            Destination = ws.Cells(13, 2) & "\" & Cells(i, response_pos) & "_" & Cells(i, 3) & ".DAT"
+                            fso.MoveFile Source, Destination
+                            If Left(Sheet.Cells(i, 19), 3) = "MCD" Or Left(Sheet.Cells(i, 19), 3) = "100" Then
+                                Sheet.Cells(i, Inbound_pos) = Format(Date, "MM/DD/YYYY")
+                                With Range(Cells(i, 1), Cells(i, Inbound_pos)).Interior
+                                    .ThemeColor = xlThemeColorAccent3
+                                    .TintAndShade = 0.799981688894314
+                                End With
+                            Else
+                                With Range(Cells(i, 1), Cells(i, response_pos)).Interior
+                                    .ThemeColor = xlThemeColorAccent3
+                                    .TintAndShade = 0.799981688894314
+                                End With
+                            End If
+                            Okcount_277CA = Okcount_277CA + 1
+                        End If
+                    ElseIf resptyp = "MAO-001" And Left(Sheet.Cells(i, response_pos), 3) <> "MCD" Then
+                        Source = ws.Cells(4, 7) & "\" & Cells(i, response_pos)
+                        totalcount_MAO001 = totalcount_MAO001 + 1
+                        If IsFileExists(Source) Then
+                            Destination = ws.Cells(13, 2) & "\" & Cells(i, response_pos) & "_" & Cells(i, 3) & ".DAT"
+                            fso.MoveFile Source, Destination
+                            With Range(Cells(i, response_pos), Cells(i, response_pos)).Interior
+                                .ThemeColor = xlThemeColorAccent3
+                                .TintAndShade = 0.799981688894314
+                            End With
+                            Okcount_MAO001 = Okcount_MAO001 + 1
+                        End If
+                    ElseIf resptyp = "MAO-002" And Left(Sheet.Cells(i, response_pos), 3) <> "MCD" Then
+                        Source = ws.Cells(4, 9) & "\" & Cells(i, response_pos)
+                        totalcount_MAO002 = totalcount_MAO002 + 1
+                        If IsFileExists(Source) Then
+                            Destination = ws.Cells(13, 2) & "\" & Cells(i, response_pos) & "_" & Cells(i, 3) & ".DAT"
+                            fso.MoveFile Source, Destination
+                            Sheet.Cells(i, Inbound_pos) = Format(Date, "MM/DD/YYYY")
+                            With Range(Cells(i, 1), Cells(i, Inbound_pos)).Interior
+                                .ThemeColor = xlThemeColorAccent3
+                                .TintAndShade = 0.799981688894314
+                            End With
+                            Okcount_MAO002 = Okcount_MAO002 + 1
+                        End If
+                    End If
+                End If
+            End If
+        End If
+    End If
+Next i
+End Sub
+
+Function IsFileExists(location As String) As Boolean
+If Right(location, 1) = "\" Then
+    IsFileExists = False
+Else
+    If Dir(location) <> "" Then
+        IsFileExists = True
+    Else
+        IsFileExists = False
+    End If
+End If
+End Function
+
+
+
+
+
+
+
+
+
+
